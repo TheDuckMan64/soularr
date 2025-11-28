@@ -537,43 +537,18 @@ def grab_most_wanted(albums):
 
         elif os.path.exists(folder):
             shutil.move(folder,artist_name_sanitized)
+            # Trigger Lidarr import per album
+            try:
+                album_import_path = os.path.join(lidarr_download_dir, artist_name_sanitized)
+                logger.info(f"Starting Lidarr import for: {album_import_path}")
+                lidarr.post_command(name='DownloadedAlbumsScan', path=album_import_path)
+            except Exception as e:
+                logger.error(f"Failed to trigger Lidarr import: {e}")
 
     if lidarr_disable_sync:
         return failed_searches
 
-    artist_folders = next(os.walk('.'))[1]
-    artist_folders = [folder for folder in artist_folders if folder != 'failed_imports']
-
-    for artist_folder in artist_folders:
-        download_dir = os.path.join(lidarr_download_dir,artist_folder)
-        command = lidarr.post_command(name = 'DownloadedAlbumsScan', path = download_dir)
-        commands.append(command)
-        logger.info(f"Starting Lidarr import for: {artist_folder} ID: {command['id']}")
-
-    while True:
-        completed_count = 0
-        for task in commands:
-            current_task = lidarr.get_command(task['id'])
-            if current_task['status'] == 'completed' or current_task['status'] == 'failed':
-                completed_count += 1
-        if completed_count == len(commands):
-            break
-        time.sleep(2)
-
-    for task in commands:
-        current_task = lidarr.get_command(task['id'])
-        try:
-            logger.info(f"{current_task['commandName']} {current_task['message']} from: {current_task['body']['path']}")
-
-            if "Failed" in current_task['message']:
-                move_failed_import(current_task['body']['path'])
-        except:
-            logger.error("Error printing lidarr task message. Printing full unparsed message.")
-            logger.error(current_task)
-
-    if enable_search_denylist:
-        save_search_denylist(denylist_file_path, search_denylist)
-
+    # Batch import removed for per-album triggering
     return failed_searches
 
 
